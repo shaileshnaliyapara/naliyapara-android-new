@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">નળીયાપરા પરિવાર</string>
+    <string name="notification_channel_name">નળીયાપરા પરિવાર Notifications</string>
+    <string name="notification_channel_description">નળીયાપરા પરિવારના અગત્યના સમાચાર અને સૂચનાઓ</string>
 </resources>

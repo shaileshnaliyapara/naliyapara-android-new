@@ -1,23 +1,14 @@
-# નળીયાપરા પરિવાર — નવી Android એપ
+# નળીયાપરા પરિવાર — Android App
 
-આ પ્રોજેક્ટ હાલ માત્ર એક કામ કરે છે:
+Package: `com.naliyapara.family1`
 
-1. એપનું નામ: **નળીયાપરા પરિવાર**
-2. Package: `com.naliyapara.family1`
-3. એપ શરૂ થતાં જ `http://naliyapara.co.in` વેબસાઇટ WebView માં ખોલે છે.
-4. હાલ Firebase/FCM/Notification code નથી.
-5. પહેલા APK build અને install સફળ કરવાનું છે.
-6. ત્યારબાદ અલગ સ્ટેપમાં Notification/FCM ઉમેરવામાં આવશે.
+This version:
+1. Opens the Naliyapara website first.
+2. Uses the Naliyapara logo as the app icon.
+3. Keeps `naliyapara.co.in` inside the app.
+4. Opens external links through Android's app/browser resolver (YouTube uses the installed YouTube app when available).
+5. Subscribes to the Firebase Cloud Messaging topic `all_users`.
+6. Registers the installation with the existing Supabase `register-notification-device` function.
+7. Supports notifications when the app is in the background/closed, subject to Android notification permission and device settings.
 
-## GitHub Actions
-
-GitHub માં:
-**Actions → Build Naliyapara Parivar APK → Run workflow → main**
-
-Build સફળ થયા પછી:
-**Actions → સફળ workflow → Artifacts → naliyapara-parivar-debug-apk**
-
-## મહત્વનું
-
-જૂના Android project ના files આ નવા project સાથે mix ન કરવા.
-આ ZIP ને અલગ નવા repository માં upload કરવું શ્રેષ્ઠ છે.
+The existing Supabase `send-fcm-notification` function sends to the `all_users` FCM topic.

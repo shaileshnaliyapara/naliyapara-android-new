@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "881968277732",
+    "project_id": "naliyapara-parivar",
+    "storage_bucket": "naliyapara-parivar.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:881968277732:android:531f289d58b1385675a4f1",
+        "android_client_info": {
+          "package_name": "com.naliyapara.family"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4_3gSMMM966owSCUhQOaVEJ994xWk65M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:881968277732:android:fd25bf5c42cddf8f75a4f1",
+        "android_client_info": {
+          "package_name": "com.naliyapara.family1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4_3gSMMM966owSCUhQOaVEJ994xWk65M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
