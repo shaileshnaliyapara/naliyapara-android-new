@@ -8,6 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -28,6 +33,8 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -46,6 +53,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREFS = "naliyapara";
     private static final String KEY_INSTALLATION_ID = "installation_id";
     private static final int REQUEST_NOTIFICATIONS = 1001;
+    private static final int REQUEST_FILE_CHOOSER = 2001;
+    private static final int REQUEST_CAMERA = 2002;
+    private ValueCallback<Uri[]> filePathCallback;
+    private Uri cameraOutputUri;
+    private boolean pendingImageChooser;
 
     private WebView webView;
     private ProgressBar progress;
@@ -86,6 +98,19 @@ public class MainActivity extends AppCompatActivity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         }
 
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback,
+                                             FileChooserParams fileChooserParams) {
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = callback;
+                openFileChooser(fileChooserParams);
+                return true;
+            }
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -107,6 +132,108 @@ public class MainActivity extends AppCompatActivity {
                 progress.setVisibility(View.GONE);
             }
         });
+    }
+
+
+    private void openFileChooser(WebChromeClient.FileChooserParams params) {
+        String[] acceptTypes = params.getAcceptTypes();
+        boolean imageOnly = false;
+        if (acceptTypes != null) {
+            for (String type : acceptTypes) {
+                if (type != null && type.toLowerCase().startsWith("image/")) {
+                    imageOnly = true;
+                    break;
+                }
+            }
+        }
+
+        Intent content = new Intent(Intent.ACTION_GET_CONTENT);
+        content.addCategory(Intent.CATEGORY_OPENABLE);
+        content.setType(imageOnly ? "image/*" : "*/*");
+        if (acceptTypes != null && acceptTypes.length > 0 && !imageOnly) {
+            content.putExtra(Intent.EXTRA_MIME_TYPES, acceptTypes);
+        }
+
+        if (imageOnly) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED) {
+                pendingImageChooser = true;
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
+                return;
+            }
+            openFileChooserForImage();
+            return;
+        }
+
+        Intent chooser = Intent.createChooser(content, "File પસંદ કરો");
+        try {
+            startActivityForResult(chooser, REQUEST_FILE_CHOOSER);
+        } catch (ActivityNotFoundException e) {
+            if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CAMERA && filePathCallback != null) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                pendingImageChooser = false;
+                openFileChooserForImage();
+            } else {
+                pendingImageChooser = false;
+                filePathCallback.onReceiveValue(null);
+                filePathCallback = null;
+            }
+        }
+    }
+
+    private void openFileChooserForImage() {
+        Intent content = new Intent(Intent.ACTION_GET_CONTENT);
+        content.addCategory(Intent.CATEGORY_OPENABLE);
+        content.setType("image/*");
+
+        Intent[] extraIntents = new Intent[0];
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (camera.resolveActivity(getPackageManager()) != null) {
+            File photoFile = null;
+            try { photoFile = File.createTempFile("naliyapara_upload_", ".jpg", getCacheDir()); }
+            catch (IOException ignored) { }
+            if (photoFile != null) {
+                cameraOutputUri = androidx.core.content.FileProvider.getUriForFile(
+                        this, getPackageName() + ".fileprovider", photoFile);
+                camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutputUri);
+                camera.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                extraIntents = new Intent[]{camera};
+            }
+        }
+        Intent chooser = Intent.createChooser(content, "Photo પસંદ કરો");
+        if (extraIntents.length > 0) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, extraIntents);
+        try { startActivityForResult(chooser, REQUEST_FILE_CHOOSER); }
+        catch (ActivityNotFoundException e) {
+            if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_FILE_CHOOSER || filePathCallback == null) return;
+
+        Uri[] results = null;
+        if (resultCode == RESULT_OK) {
+            if (data != null && data.getData() != null) {
+                results = new Uri[]{data.getData()};
+            } else if (cameraOutputUri != null) {
+                results = new Uri[]{cameraOutputUri};
+            }
+        }
+        filePathCallback.onReceiveValue(results);
+        filePathCallback = null;
+        cameraOutputUri = null;
     }
 
     private boolean handleUrl(Uri uri) {
