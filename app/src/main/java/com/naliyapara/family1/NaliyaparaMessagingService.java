@@ -62,7 +62,8 @@ public class NaliyaparaMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onNewToken(String token) {
-        // Topic subscription is restored by Firebase when the app initializes.
-        // The server sends notifications to the all_users topic.
+        // Keep this device subscribed after an FCM token refresh.
+        com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                .subscribeToTopic("all_users");
     }
 }

@@ -39,6 +39,7 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity {
 
     private static final String WEBSITE_URL = "http://naliyapara.co.in";
+    private static final String APP_NAME = "નળીયાપરા પરિવાર";
     private static final String WEBSITE_HOST = "naliyapara.co.in";
     private static final String REGISTER_URL =
             "https://kfeaejmlshjliesrirku.supabase.co/functions/v1/register-notification-device";
@@ -125,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 || host.equals("m.youtube.com") || host.equals("youtu.be")
                 || host.endsWith(".youtube.com")) {
             Intent youtubeIntent = new Intent(Intent.ACTION_VIEW, uri);
+            youtubeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             youtubeIntent.setPackage("com.google.android.youtube");
             try {
                 startActivity(youtubeIntent);
@@ -138,6 +140,7 @@ public class MainActivity extends AppCompatActivity {
         // or the browser when no matching app is installed.
         Intent external = new Intent(Intent.ACTION_VIEW, uri);
         external.addCategory(Intent.CATEGORY_BROWSABLE);
+        external.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             startActivity(external);
         } catch (ActivityNotFoundException ignored) {
