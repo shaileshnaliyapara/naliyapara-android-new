@@ -12,3 +12,7 @@
 
 ## GitHub Actions
 આ project ને existing GitHub repository માં upload કરીને workflow_dispatch થી build કરી શકાય છે.
+
+
+## Overlay fix
+આ versionમાં Android 15+ માટે system-bar insets ઉમેરવામાં આવ્યા છે જેથી website ઉપર status/camera area અને નીચે navigation bar પાછળ ન જાય.

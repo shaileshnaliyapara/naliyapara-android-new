@@ -24,6 +24,9 @@ import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 
 import androidx.annotation.Nullable;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -65,7 +68,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Android 15+ uses edge-to-edge by default for apps targeting API 35.
+        // Keep the website content inside the safe area so it never sits behind
+        // the camera/status bar at the top or the system navigation bar at the bottom.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
+        applySystemBarInsets();
 
         createNotificationChannel();
 
@@ -81,6 +90,33 @@ public class MainActivity extends AppCompatActivity {
         } else {
             webView.restoreState(savedInstanceState);
         }
+    }
+
+    private void applySystemBarInsets() {
+        View root = findViewById(R.id.rootContainer);
+        if (root == null) return;
+
+        final int initialLeft = root.getPaddingLeft();
+        final int initialTop = root.getPaddingTop();
+        final int initialRight = root.getPaddingRight();
+        final int initialBottom = root.getPaddingBottom();
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            WindowInsetsCompat safeInsets = insets;
+            androidx.core.graphics.Insets bars = safeInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+
+            view.setPadding(
+                    initialLeft + bars.left,
+                    initialTop + bars.top,
+                    initialRight + bars.right,
+                    initialBottom + bars.bottom
+            );
+            return insets;
+        });
+
+        ViewCompat.requestApplyInsets(root);
     }
 
     private void configureWebView() {
