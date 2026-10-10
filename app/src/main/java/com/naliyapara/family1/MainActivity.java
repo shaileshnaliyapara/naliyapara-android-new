@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -13,6 +14,8 @@ import android.graphics.Bitmap;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.webkit.ValueCallback;
+import android.webkit.JavascriptInterface;
+import android.util.Base64;
 import android.webkit.WebChromeClient;
 import android.net.Uri;
 import android.os.Build;
@@ -41,6 +44,7 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -64,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CAMERA = 2002;
     private static final int REQUEST_DOWNLOAD_STORAGE = 2003;
     private String pendingDownloadUrl, pendingDownloadUserAgent, pendingDownloadDisposition, pendingDownloadMimeType;
+    private final String downloadBridgeToken = UUID.randomUUID().toString();
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraOutputUri;
     private boolean pendingImageChooser;
@@ -140,6 +145,8 @@ public class MainActivity extends AppCompatActivity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         }
 
+        webView.addJavascriptInterface(new DownloadBridge(), "NaliyaparaDownload");
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback,
@@ -190,10 +197,85 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progress.setVisibility(View.GONE);
+                Uri pageUri = Uri.parse(url);
+                String pageHost = pageUri.getHost() == null ? "" : pageUri.getHost().toLowerCase();
+                if (pageHost.equals(WEBSITE_HOST) || pageHost.endsWith("." + WEBSITE_HOST)) {
+                    injectBlobDownloadSupport(view);
+                }
             }
         });
     }
 
+
+    // WebView's DownloadListener does not receive blob: or data: URLs created by
+    // JavaScript. Intercept those downloads on our own trusted website and save
+    // them through MediaStore so Android 10+ needs no broad storage permission.
+    private void injectBlobDownloadSupport(WebView view) {
+        String token = downloadBridgeToken;
+        String script = "(function(){"
+                + "if(window.__naliyaparaDownloadHooked)return;"
+                + "window.__naliyaparaDownloadHooked=true;"
+                + "document.addEventListener('click',function(e){"
+                + "var a=e.target&&e.target.closest?e.target.closest('a'):null;"
+                + "if(!a)return;var href=a.href||'';"
+                + "if(!href.startsWith('blob:')&&!href.startsWith('data:'))return;"
+                + "e.preventDefault();e.stopImmediatePropagation();"
+                + "var name=a.getAttribute('download')||'naliyapara-download';"
+                + "fetch(href).then(function(r){return r.blob();}).then(function(blob){"
+                + "var reader=new FileReader();reader.onloadend=function(){"
+                + "var result=String(reader.result||'');var comma=result.indexOf(',');"
+                + "if(comma<0){alert('ફાઇલ તૈયાર થઈ શકી નથી');return;}"
+                + "window.NaliyaparaDownload.saveBase64File('" + token + "',name,"
+                + "blob.type||'application/octet-stream',result.substring(comma+1));"
+                + "};reader.readAsDataURL(blob);"
+                + "}).catch(function(){alert('ફાઇલ ડાઉનલોડ થઈ શકી નથી');});"
+                + "},true);})();";
+        view.evaluateJavascript(script, null);
+    }
+
+    private class DownloadBridge {
+        @JavascriptInterface
+        public void saveBase64File(String token, String fileName, String mimeType, String encodedData) {
+            if (token == null || !downloadBridgeToken.equals(token) || encodedData == null) return;
+            try {
+                byte[] bytes = Base64.decode(encodedData, Base64.DEFAULT);
+                String safeName = fileName == null ? "naliyapara-download" : fileName;
+                safeName = safeName.replaceAll("[\\\\/:*?\\"<>|]", "_").trim();
+                if (safeName.isEmpty()) safeName = "naliyapara-download";
+                String safeMime = mimeType == null || mimeType.trim().isEmpty()
+                        ? "application/octet-stream" : mimeType;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
+                    values.put(MediaStore.Downloads.MIME_TYPE, safeMime);
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    values.put(MediaStore.Downloads.IS_PENDING, 1);
+                    Uri item = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (item == null) throw new IOException("Could not create Downloads item");
+                    try (OutputStream output = getContentResolver().openOutputStream(item)) {
+                        if (output == null) throw new IOException("Could not open Downloads item");
+                        output.write(bytes);
+                    }
+                    ContentValues done = new ContentValues();
+                    done.put(MediaStore.Downloads.IS_PENDING, 0);
+                    getContentResolver().update(item, done, null, null);
+                } else {
+                    File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (!downloads.exists() && !downloads.mkdirs()) throw new IOException("Could not create Downloads folder");
+                    File target = new File(downloads, safeName);
+                    try (FileOutputStream output = new FileOutputStream(target)) {
+                        output.write(bytes);
+                    }
+                }
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        "ફાઇલ Downloads ફોલ્ડરમાં સેવ થઈ ગઈ છે.", Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        "ફાઇલ સેવ થઈ શકી નથી. ફરી પ્રયાસ કરો.", Toast.LENGTH_LONG).show());
+            }
+        }
+    }
 
     private void startDownload(String url, String userAgent, String contentDisposition, String mimeType) {
         try {
