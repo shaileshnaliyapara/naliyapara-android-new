@@ -3,6 +3,7 @@ package com.naliyapara.family1;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -21,7 +22,10 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.CookieManager;
+import android.webkit.URLUtil;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
@@ -147,6 +151,40 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // Handle website downloads through Android Download Manager. Modern Android
+        // uses the system Downloads collection, so broad storage access is not needed.
+        webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            try {
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                String cookies = CookieManager.getInstance().getCookie(url);
+                if (cookies != null && !cookies.isEmpty()) {
+                    request.addRequestHeader("Cookie", cookies);
+                }
+                if (userAgent != null) request.addRequestHeader("User-Agent", userAgent);
+                if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
+
+                String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                request.setTitle(fileName);
+                request.setDescription("નળીયાપરા પરિવાર: ફાઇલ ડાઉનલોડ થઈ રહી છે");
+                request.setNotificationVisibility(
+                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setAllowedOverMetered(true);
+                request.setAllowedOverRoaming(true);
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+
+                DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                if (manager != null) {
+                    manager.enqueue(request);
+                    Toast.makeText(this, "ડાઉનલોડ શરૂ થયું છે. Downloads ફોલ્ડર તપાસો.",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "ડાઉનલોડ સેવા ઉપલબ્ધ નથી.", Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "ફાઇલ ડાઉનલોડ થઈ શકી નથી.", Toast.LENGTH_LONG).show();
+            }
+        });
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -191,13 +229,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (imageOnly) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED) {
-                pendingImageChooser = true;
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA);
-                return;
-            }
+            // Opening the photo picker does not require broad storage permission.
+            // Camera permission is not required just to choose an existing photo.
             openFileChooserForImage();
             return;
         }
