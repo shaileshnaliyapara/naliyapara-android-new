@@ -240,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 byte[] bytes = Base64.decode(encodedData, Base64.DEFAULT);
                 String safeName = fileName == null ? "naliyapara-download" : fileName;
-                safeName = safeName.replaceAll("[\\\\/:*?\\"<>|]", "_").trim();
+                safeName = safeName.replace("/", "_").replace("\\", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace("\"", "_").replace("<", "_").replace(">", "_").replace("|", "_").trim();
                 if (safeName.isEmpty()) safeName = "naliyapara-download";
                 String safeMime = mimeType == null || mimeType.trim().isEmpty()
                         ? "application/octet-stream" : mimeType;
