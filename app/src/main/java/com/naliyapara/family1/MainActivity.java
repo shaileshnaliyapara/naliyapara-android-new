@@ -62,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_NOTIFICATIONS = 1001;
     private static final int REQUEST_FILE_CHOOSER = 2001;
     private static final int REQUEST_CAMERA = 2002;
+    private static final int REQUEST_DOWNLOAD_STORAGE = 2003;
+    private String pendingDownloadUrl, pendingDownloadUserAgent, pendingDownloadDisposition, pendingDownloadMimeType;
     private ValueCallback<Uri[]> filePathCallback;
     private Uri cameraOutputUri;
     private boolean pendingImageChooser;
@@ -154,35 +156,19 @@ public class MainActivity extends AppCompatActivity {
         // Handle website downloads through Android Download Manager. Modern Android
         // uses the system Downloads collection, so broad storage access is not needed.
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
-            try {
-                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-                String cookies = CookieManager.getInstance().getCookie(url);
-                if (cookies != null && !cookies.isEmpty()) {
-                    request.addRequestHeader("Cookie", cookies);
-                }
-                if (userAgent != null) request.addRequestHeader("User-Agent", userAgent);
-                if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
-
-                String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                request.setTitle(fileName);
-                request.setDescription("નળીયાપરા પરિવાર: ફાઇલ ડાઉનલોડ થઈ રહી છે");
-                request.setNotificationVisibility(
-                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setAllowedOverMetered(true);
-                request.setAllowedOverRoaming(true);
-                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-
-                DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                if (manager != null) {
-                    manager.enqueue(request);
-                    Toast.makeText(this, "ડાઉનલોડ શરૂ થયું છે. Downloads ફોલ્ડર તપાસો.",
-                            Toast.LENGTH_LONG).show();
-                } else {
-                    Toast.makeText(this, "ડાઉનલોડ સેવા ઉપલબ્ધ નથી.", Toast.LENGTH_LONG).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "ફાઇલ ડાઉનલોડ થઈ શકી નથી.", Toast.LENGTH_LONG).show();
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+                    && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                pendingDownloadUrl = url;
+                pendingDownloadUserAgent = userAgent;
+                pendingDownloadDisposition = contentDisposition;
+                pendingDownloadMimeType = mimeType;
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                        REQUEST_DOWNLOAD_STORAGE);
+                return;
             }
+            startDownload(url, userAgent, contentDisposition, mimeType);
         });
 
         webView.setWebViewClient(new WebViewClient() {
@@ -208,6 +194,33 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    private void startDownload(String url, String userAgent, String contentDisposition, String mimeType) {
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            String cookies = CookieManager.getInstance().getCookie(url);
+            if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
+            if (userAgent != null) request.addRequestHeader("User-Agent", userAgent);
+            if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
+            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            request.setTitle(fileName);
+            request.setDescription("નળીયાપરા પરિવાર: ફાઇલ ડાઉનલોડ થઈ રહી છે");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(true);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (manager != null) {
+                manager.enqueue(request);
+                Toast.makeText(this, "ડાઉનલોડ શરૂ થયું છે. Downloads ફોલ્ડર તપાસો.",
+                        Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "ડાઉનલોડ સેવા ઉપલબ્ધ નથી.", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "ફાઇલ ડાઉનલોડ થઈ શકી નથી.", Toast.LENGTH_LONG).show();
+        }
+    }
 
     private void openFileChooser(WebChromeClient.FileChooserParams params) {
         String[] acceptTypes = params.getAcceptTypes();
@@ -247,6 +260,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_DOWNLOAD_STORAGE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                    && pendingDownloadUrl != null) {
+                startDownload(pendingDownloadUrl, pendingDownloadUserAgent,
+                        pendingDownloadDisposition, pendingDownloadMimeType);
+            } else {
+                Toast.makeText(this, "ફાઇલ ડાઉનલોડ કરવા સ્ટોરેજ પરવાનગી જરૂરી છે.",
+                        Toast.LENGTH_LONG).show();
+            }
+            pendingDownloadUrl = null;
+            pendingDownloadUserAgent = null;
+            pendingDownloadDisposition = null;
+            pendingDownloadMimeType = null;
+        }
         if (requestCode == REQUEST_CAMERA && filePathCallback != null) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 pendingImageChooser = false;
