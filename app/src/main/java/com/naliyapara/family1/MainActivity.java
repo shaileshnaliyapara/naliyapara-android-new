@@ -59,8 +59,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String WEBSITE_URL = "http://naliyapara.co.in";
     private static final String APP_NAME = "નળીયાપરા પરિવાર";
     private static final String WEBSITE_HOST = "naliyapara.co.in";
-    private static final String REGISTER_URL =
-            "https://kfeaejmlshjliesrirku.supabase.co/functions/v1/register-notification-device";
     private static final String PREFS = "naliyapara";
     private static final String KEY_INSTALLATION_ID = "installation_id";
     private static final int REQUEST_NOTIFICATIONS = 1001;
@@ -464,47 +462,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void registerThisDevice() {
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String installationId = prefs.getString(KEY_INSTALLATION_ID, null);
-        if (installationId == null) {
-            installationId = UUID.randomUUID().toString();
-            prefs.edit().putString(KEY_INSTALLATION_ID, installationId).apply();
-        }
-
-        final String id = installationId;
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(REGISTER_URL);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(10000);
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json");
-
-                JSONObject body = new JSONObject();
-                body.put("installationId", id);
-                body.put("platform", "android");
-                body.put("appVersion", "1.0");
-
-                byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream output = connection.getOutputStream()) {
-                    output.write(bytes);
-                }
-
-                int code = connection.getResponseCode();
-                if (code >= 200 && code < 300) {
-                    // Registered successfully.
-                } else {
-                    readResponse(connection.getErrorStream());
-                }
-            } catch (Exception ignored) {
-                // Device registration must never prevent the website from opening.
-            } finally {
-                if (connection != null) connection.disconnect();
-            }
-        }).start();
+        // Device info + FCM token Supabase "device-register" ne mokle chhe (admin device identify karva mate).
+        DeviceRegistrar.registerWithCurrentToken(this);
     }
 
     private String readResponse(InputStream input) {
