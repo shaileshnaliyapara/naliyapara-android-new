@@ -65,5 +65,7 @@ public class NaliyaparaMessagingService extends FirebaseMessagingService {
         // Keep this device subscribed after an FCM token refresh.
         com.google.firebase.messaging.FirebaseMessaging.getInstance()
                 .subscribeToTopic("all_users");
+        // Navo token Supabase ma update karo (admin device ne request notification male te mate).
+        DeviceRegistrar.register(this, token);
     }
 }
